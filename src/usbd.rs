@@ -507,18 +507,18 @@ impl<'d, T: Instance> driver::Bus for Bus<'d, T> {
                 IRQ_RESET.store(false, Ordering::Relaxed);
 
                 crate::println!("RESET");
+                regs.epr(0).write(|w| {
+                    w.set_ep_type(EpType::CONTROL);
+                    w.set_stat_rx(Stat::NAK);
+                    w.set_stat_tx(Stat::NAK);
+                });
+
                 regs.daddr().write(|w| {
                     w.set_ef(true);
                     w.set_add(0);
                 });
 
                 // btable::dump();
-
-                regs.epr(0).write(|w| {
-                    w.set_ep_type(EpType::CONTROL);
-                    w.set_stat_rx(Stat::NAK);
-                    w.set_stat_tx(Stat::NAK);
-                });
 
                 for i in 1..EP_COUNT {
                     regs.epr(i).write(|w| {
