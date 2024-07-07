@@ -16,6 +16,7 @@ use embassy_usb_driver::{
 };
 
 use crate::gpio::Speed;
+use crate::interrupt::typelevel::Interrupt;
 use crate::pac::usbd::regs;
 use crate::pac::usbd::vals::{EpType, Stat};
 use crate::pac::{EXTEND, USBRAM};
@@ -85,15 +86,17 @@ impl<T: Instance> interrupt::typelevel::Handler<T::Interrupt> for InterruptHandl
         if istr.ctr() {
             let index = istr.ep_id() as usize;
             let mut epr = regs.epr(index).read();
+            crate::println!("CTR: EPR: {:x}", epr.0);
             if epr.ctr_rx() {
                 if index == 0 && epr.setup() {
+                    crate::println!("CTR: EP0 Setup");
                     EP0_SETUP.store(true, Ordering::Relaxed);
                 }
                 crate::println!("EP {} RX, setup={}", index, epr.setup());
                 EP_OUT_WAKERS[index].wake();
             }
             if epr.ctr_tx() {
-                //crate::println!("EP {} TX", index);
+                crate::println!("EP {} TX", index);
                 EP_IN_WAKERS[index].wake();
             }
             epr.set_dtog_rx(false);
@@ -176,6 +179,20 @@ mod btable {
     pub(super) fn read_out_len<T: Instance>(index: usize) -> u16 {
         USBRAM.mem(index * 4 + 3).read()
     }
+
+    pub(super) fn dump() {
+        for i in 0..USBRAM_SIZE / USBRAM_ALIGN {
+            //for i in 44..50 {
+            let val = USBRAM.mem(i).read();
+            crate::println!("RAM DUMP: {} {:x} {:x}", i, (val >> 8), val & 0xFF);
+        }
+    }
+
+    pub(super) fn clear() {
+        for i in 0..USBRAM_SIZE / USBRAM_ALIGN {
+            let val = USBRAM.mem(i).write_value(0);
+        }
+    }
 }
 
 struct EndpointBuffer<T: Instance> {
@@ -247,12 +264,16 @@ impl<'d, T: Instance> Driver<'d, T> {
         {
             // FV2x_V3x
             EXTEND.ctr().modify(|w| {
-                w.set_usbdpu(true);
                 w.set_usbdls(false); // full speed
             });
 
             T::enable_and_reset();
+            //T::Interrupt::unpend();
+            unsafe { T::Interrupt::enable() };
         }
+
+        btable::clear();
+        // btable::dump();
 
         let regs = T::regs();
 
@@ -264,6 +285,7 @@ impl<'d, T: Instance> Driver<'d, T> {
         embassy_time::block_for(embassy_time::Duration::from_millis(100));
 
         regs.btable().write(|w| w.set_btable(0));
+        regs.daddr().write(|w| w.set_add(0));
 
         // Initialize the bus so that it signals that power is available
         BUS_WAKER.wake();
@@ -330,7 +352,7 @@ impl<'d, T: Instance> Driver<'d, T> {
                 let (len, len_bits) = calc_out_len(max_packet_size);
                 let addr = self.alloc_ep_mem(len);
 
-                crate::println!("  len_bits = {:04x}", len_bits);
+                crate::println!(" len = {len} len_bits = {:04x}", len_bits);
                 btable::write_out::<T>(index, addr, len_bits);
 
                 EndpointBuffer {
@@ -408,6 +430,21 @@ impl<'d, T: Instance> driver::Driver<'d> for Driver<'d, T> {
 
         let regs = T::regs();
 
+        regs.epr(0).write(|w| {
+            w.set_ep_type(EpType::CONTROL);
+            w.set_stat_rx(Stat::NAK);
+            w.set_stat_tx(Stat::NAK);
+        });
+
+        regs.daddr().write(|w| {
+            w.set_ef(true);
+            w.set_add(0);
+        });
+
+        EXTEND.ctr().modify(|w| {
+            w.set_usbdpu(true);
+        });
+
         regs.cntr().write(|w| {
             w.set_pdwn(false);
             w.set_fres(false);
@@ -418,6 +455,7 @@ impl<'d, T: Instance> driver::Driver<'d> for Driver<'d, T> {
         });
 
         crate::println!("enabled");
+        //btable::dump();
 
         let mut ep_types = [EpType::BULK; EP_COUNT - 1];
         for i in 1..EP_COUNT {
@@ -473,6 +511,8 @@ impl<'d, T: Instance> driver::Bus for Bus<'d, T> {
                     w.set_ef(true);
                     w.set_add(0);
                 });
+
+                // btable::dump();
 
                 regs.epr(0).write(|w| {
                     w.set_ep_type(EpType::CONTROL);
@@ -815,15 +855,17 @@ impl<'d, T: Instance> driver::ControlPipe for ControlPipe<'d, T> {
             }
 
             EP0_SETUP.store(false, Ordering::Relaxed);
+            crate::println!("SETUP data: {:?}", buf);
 
             crate::println!("SETUP read ok");
+            // btable::dump();
             return buf;
         }
     }
 
     async fn data_out(&mut self, buf: &mut [u8], first: bool, last: bool) -> Result<usize, EndpointError> {
         let regs = T::regs();
-
+        crate::println!("data_out control setup");
         // When a SETUP is received, Stat/Stat is set to NAK.
         // On first transfer, we must set Stat=VALID, to get the OUT data stage.
         // We want Stat=STALL so that the host gets a STALL if it switches to the status
@@ -989,6 +1031,7 @@ impl<'d, T: Instance> driver::ControlPipe for ControlPipe<'d, T> {
     async fn reject(&mut self) {
         let regs = T::regs();
         crate::println!("control: reject");
+        // btable::dump();
 
         // Set IN+OUT to stall
         let epr = regs.epr(0).read();
