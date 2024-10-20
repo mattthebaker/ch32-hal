@@ -5,7 +5,6 @@
 pub use ch32_metapac as pac;
 pub(crate) use embassy_hal_internal::{impl_peripheral, peripherals_definition, peripherals_struct};
 pub use embassy_hal_internal::{into_ref, Peripheral, PeripheralRef};
-
 #[cfg(feature = "rt")]
 pub use qingke_rt::{entry, interrupt};
 

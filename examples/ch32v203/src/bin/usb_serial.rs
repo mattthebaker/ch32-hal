@@ -1,6 +1,7 @@
 #![no_std]
 #![no_main]
 #![feature(type_alias_impl_trait)]
+#![feature(impl_trait_in_assoc_type)]
 #![feature(naked_functions)]
 
 use ch32_hal::usbd::{Driver, Instance};
@@ -35,15 +36,15 @@ async fn main(spawner: Spawner) -> ! {
 
     // Required for windows compatibility.
     // https://developer.nordicsemi.com/nRF_Connect_SDK/doc/1.9.1/kconfig/CONFIG_CDC_ACM_IAD.html#help
-    config.device_class = 0xEF;
-    config.device_sub_class = 0x02;
-    config.device_protocol = 0x01;
-    config.composite_with_iads = true;
-    config.max_packet_size_0 = 16;
+    // config.device_class = 0xEF;
+    // config.device_sub_class = 0x02;
+    // config.device_protocol = 0x01;
+    // config.composite_with_iads = true;
+    config.max_packet_size_0 = 8;
 
     // Create embassy-usb DeviceBuilder using the driver and config.
     // It needs some buffers for building the descriptors.
-    let mut device_descriptor = [0; 32];
+    // let mut device_descriptor = [0; 32];
     let mut config_descriptor = [0; 128];
     let mut bos_descriptor = [0; 128];
     let mut control_buf = [0; 16];
@@ -53,7 +54,7 @@ async fn main(spawner: Spawner) -> ! {
     let mut builder = Builder::new(
         driver,
         config,
-        &mut device_descriptor,
+        // &mut device_descriptor,
         &mut config_descriptor,
         &mut bos_descriptor,
         &mut [], // no msos descriptors
@@ -65,7 +66,7 @@ async fn main(spawner: Spawner) -> ! {
     led.set_high();
 
     // Create classes on the builder.
-    let mut class = CdcAcmClass::new(&mut builder, &mut state, 8);
+    let mut class = CdcAcmClass::new(&mut builder, &mut state, 64);
 
     //// Build the builder.
     let mut usb = builder.build();

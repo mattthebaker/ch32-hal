@@ -54,7 +54,7 @@ impl<T: Instance> interrupt::typelevel::Handler<T::Interrupt> for InterruptHandl
         }
 
         if istr.wkup() {
-            crate::println!("USB IRQ: wkup");
+            // crate::println!("USB IRQ: wkup");
             IRQ_RESUME.store(true, Ordering::Relaxed);
             regs.cntr().modify(|w| {
                 w.set_fsusp(false);
@@ -71,7 +71,7 @@ impl<T: Instance> interrupt::typelevel::Handler<T::Interrupt> for InterruptHandl
         }
 
         if istr.reset() {
-            crate::println!("USB IRQ: reset");
+            // crate::println!("USB IRQ: reset");
             IRQ_RESET.store(true, Ordering::Relaxed);
 
             // Write 0 to clear.
@@ -86,17 +86,17 @@ impl<T: Instance> interrupt::typelevel::Handler<T::Interrupt> for InterruptHandl
         if istr.ctr() {
             let index = istr.ep_id() as usize;
             let mut epr = regs.epr(index).read();
-            crate::println!("CTR: EPR: {:x}", epr.0);
+            // crate::println!("CTR: EPR: {:x}", epr.0);
             if epr.ctr_rx() {
                 if index == 0 && epr.setup() {
-                    crate::println!("CTR: EP0 Setup");
+                    // crate::println!("CTR: EP0 Setup");
                     EP0_SETUP.store(true, Ordering::Relaxed);
                 }
-                crate::println!("EP {} RX, setup={}", index, epr.setup());
+                // crate::println!("EP {} RX, setup={}", index, epr.setup());
                 EP_OUT_WAKERS[index].wake();
             }
             if epr.ctr_tx() {
-                crate::println!("EP {} TX", index);
+                // crate::println!("EP {} TX", index);
                 EP_IN_WAKERS[index].wake();
             }
             epr.set_dtog_rx(false);
@@ -264,6 +264,7 @@ impl<'d, T: Instance> Driver<'d, T> {
         {
             // FV2x_V3x
             EXTEND.ctr().modify(|w| {
+                w.set_usbdpu(true);
                 w.set_usbdls(false); // full speed
             });
 
@@ -272,7 +273,7 @@ impl<'d, T: Instance> Driver<'d, T> {
             unsafe { T::Interrupt::enable() };
         }
 
-        btable::clear();
+        //btable::clear();
         // btable::dump();
 
         let regs = T::regs();
@@ -430,20 +431,20 @@ impl<'d, T: Instance> driver::Driver<'d> for Driver<'d, T> {
 
         let regs = T::regs();
 
-        regs.epr(0).write(|w| {
-            w.set_ep_type(EpType::CONTROL);
-            w.set_stat_rx(Stat::NAK);
-            w.set_stat_tx(Stat::NAK);
-        });
+        // regs.epr(0).write(|w| {
+        //     w.set_ep_type(EpType::CONTROL);
+        //     w.set_stat_rx(Stat::NAK);
+        //     w.set_stat_tx(Stat::NAK);
+        // });
 
-        regs.daddr().write(|w| {
-            w.set_ef(true);
-            w.set_add(0);
-        });
+        // regs.daddr().write(|w| {
+        //     w.set_ef(true);
+        //     w.set_add(0);
+        // });
 
-        EXTEND.ctr().modify(|w| {
-            w.set_usbdpu(true);
-        });
+        // EXTEND.ctr().modify(|w| {
+        //     w.set_usbdpu(true);
+        // });
 
         regs.cntr().write(|w| {
             w.set_pdwn(false);
@@ -507,15 +508,15 @@ impl<'d, T: Instance> driver::Bus for Bus<'d, T> {
                 IRQ_RESET.store(false, Ordering::Relaxed);
 
                 crate::println!("RESET");
+                regs.daddr().write(|w| {
+                    w.set_ef(true);
+                    w.set_add(0);
+                });
+
                 regs.epr(0).write(|w| {
                     w.set_ep_type(EpType::CONTROL);
                     w.set_stat_rx(Stat::NAK);
                     w.set_stat_tx(Stat::NAK);
-                });
-
-                regs.daddr().write(|w| {
-                    w.set_ef(true);
-                    w.set_add(0);
                 });
 
                 // btable::dump();
@@ -855,7 +856,7 @@ impl<'d, T: Instance> driver::ControlPipe for ControlPipe<'d, T> {
             }
 
             EP0_SETUP.store(false, Ordering::Relaxed);
-            crate::println!("SETUP data: {:?}", buf);
+            // crate::println!("SETUP data: {:?}", buf);
 
             crate::println!("SETUP read ok");
             // btable::dump();
