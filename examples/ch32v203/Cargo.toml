@@ -24,8 +24,8 @@ embassy-time = { version = "0.3.0" }
 embassy-usb = { version = "0.3.0" }
 embassy-futures = { version = "0.1.0" }
 
-qingke-rt = "0.2.1"
-qingke = "0.2.0"
+qingke-rt = "0.3.0"
+qingke = "0.3.0"
 #qingke-rt = { version = "0.2.0", path = "../../../qingke/qingke-rt" }
 # qingke = { version = "0.2.0", path = "../../../qingke" }
 

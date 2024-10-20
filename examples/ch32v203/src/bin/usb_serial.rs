@@ -21,7 +21,7 @@ bind_interrupts!(struct Irqs {
 async fn main(spawner: Spawner) -> ! {
     hal::debug::SDIPrint::enable();
     let mut config = hal::Config::default();
-    config.rcc = hal::rcc::Config::SYSCLK_FREQ_96MHZ_HSE;
+    config.rcc = hal::rcc::Config::SYSCLK_FREQ_144MHZ_HSE;
     let p = hal::init(config);
     hal::embassy::init();
 
@@ -43,7 +43,7 @@ async fn main(spawner: Spawner) -> ! {
 
     // Create embassy-usb DeviceBuilder using the driver and config.
     // It needs some buffers for building the descriptors.
-    //let mut device_descriptor = [0; 256];
+    let mut device_descriptor = [0; 32];
     let mut config_descriptor = [0; 128];
     let mut bos_descriptor = [0; 128];
     let mut control_buf = [0; 16];
@@ -53,7 +53,7 @@ async fn main(spawner: Spawner) -> ! {
     let mut builder = Builder::new(
         driver,
         config,
-        //&mut device_descriptor,
+        &mut device_descriptor,
         &mut config_descriptor,
         &mut bos_descriptor,
         &mut [], // no msos descriptors

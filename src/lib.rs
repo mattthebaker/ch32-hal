@@ -80,6 +80,8 @@ pub mod usart;
 pub mod usb;
 #[cfg(usbd)]
 pub mod usbd;
+#[cfg(usbfs)]
+pub mod usbfs;
 
 #[cfg(usbpd)]
 pub mod usbpd;
